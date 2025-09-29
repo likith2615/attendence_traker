@@ -6,7 +6,8 @@
   "main": "index.js",
  "scripts": {
    "build": "react-scripts build",
-  "postinstall": "npx playwright install"
+  "postinstall": "npx playwright install --force"
+
 },
   "keywords": [],
   "author": "",
