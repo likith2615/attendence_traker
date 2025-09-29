@@ -5,6 +5,7 @@
   "description": "",
   "main": "index.js",
  "scripts": {
+   "build": "react-scripts build",
   "postinstall": "npx playwright install"
 },
   "keywords": [],
