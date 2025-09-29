@@ -35,8 +35,9 @@ app.post("/api/attendance", async (req, res) => {
   }
 });
 
-const port = 3000;
-app.listen(port, () => {
-  console.log(`Server listening at http://localhost:${port}`);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server listening at http://localhost:${PORT}`);
 });
+
 console.log('Static folder is:', path.join(__dirname, "public"));
