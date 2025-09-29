@@ -4,8 +4,8 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "scripts": {
-    
+ "scripts": {
+  "postinstall": "npx playwright install"
 },
   "keywords": [],
   "author": "",
