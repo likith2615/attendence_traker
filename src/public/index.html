@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Attendance Tracker by Likith</title>
+<link href="https://fonts.googleapis.com/css?family=Inter:400,700,900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --canvas-bg: #FFFFFF;
+    --primary-text: #2B2B2B;
+    --secondary-text: #4A4A4A;
+    --tertiary-text: #8C8C8C;
+    --border-color: #D4D4D4;
+    --card-bg: #F8F8F8;
+    --primary-accent: #3A7DFF;
+
+    --status-success: #4CAF50;
+    --status-warning: #FFC107;
+    --status-danger: #F44336;
+    --status-info: #2196F3;
+
+    --chart-1: #3A7DFF;
+    --chart-2: #8E44AD;
+    --chart-3: #27AE60;
+    --chart-4: #E67E22;
+  }
+
+  body {
+    background: var(--canvas-bg);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    color: var(--primary-text);
+    margin: 0;
+    padding: 1.5em;
+  }
+
+  h1 {
+    font-weight: 900;
+    font-size: 3.5em;
+    color: var(--primary-text);
+    margin-bottom: 0.2em;
+  }
+
+  p.main-desc {
+    color: var(--secondary-text);
+    font-size: 1.2em;
+  }
+
+  button#trackBtn {
+    background: var(--primary-accent);
+    border: none;
+    border-radius: 20px;
+    padding: 1em 3em;
+    font-size: 1.5em;
+    font-weight: 700;
+    color: var(--canvas-bg);
+    cursor: pointer;
+    box-shadow: 0 4px 12px var(--primary-accent);
+    transition: background 0.3s, box-shadow 0.3s;
+    margin: 1.5em 0 3em 0;
+  }
+
+  button#trackBtn:hover {
+    background: #2e6add;
+    box-shadow: 0 6px 20px #2e6add;
+  }
+
+  #loginForm, #attendanceSection, #cards-container {
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 2em 2.5em;
+    box-shadow: 0 4px 12px #e0e0e0;
+    max-width: 840px;
+    margin: 1.5em auto;
+  }
+
+  #loginForm {
+    display: none;
+  }
+
+  #loginForm h2, #attendanceSection h2 {
+    font-weight: 900;
+    color: var(--primary-text);
+    margin-bottom: 1em;
+  }
+
+  label {
+    display: block;
+    margin: 1em 0 0.5em 0;
+    font-size: 1.1em;
+    color: var(--primary-text);
+    font-weight: 600;
+  }
+
+  input[type="text"], input[type="password"], input[type="number"] {
+    width: 100%;
+    padding: 0.6em 1em;
+    font-size: 1em;
+    border: 1.8px solid var(--border-color);
+    border-radius: 15px;
+    box-sizing: border-box;
+    color: var(--primary-text);
+    background-color: white;
+    transition: border-color 0.3s;
+  }
+
+  input[type="text"]:focus, input[type="password"]:focus, input[type="number"]:focus {
+    border-color: var(--primary-accent);
+    outline: none;
+  }
+
+  #loginForm button {
+    margin-top: 2em;
+    width: 100%;
+    padding: 0.8em 1em;
+    border-radius: 15px;
+    font-weight: 700;
+    font-size: 1.25em;
+    color: var(--canvas-bg);
+    background-color: var(--primary-accent);
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+
+  #loginForm button:hover {
+    background-color: #3059c7;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 1.15em;
+    margin-top: 1em;
+  }
+
+  th, td {
+    padding: 1em 1.5em;
+    text-align: center;
+  }
+
+  th {
+    background-color: var(--primary-accent);
+    color: var(--canvas-bg);
+    font-weight: 700;
+  }
+
+  tr:nth-child(odd) {
+    background-color: #edf2fc;
+  }
+
+  tr:nth-child(even) {
+    background-color: #dbe7fa;
+  }
+
+  #totals {
+    margin-top: 1.5em;
+    font-weight: 700;
+    font-size: 1.2em;
+    color: var(--primary-text);
+  }
+
+  #cards-container {
+    display: flex;
+    justify-content: center;
+    gap: 2.5em;
+    margin-top: 2.5em;
+    flex-wrap: wrap;
+  }
+
+  .calc-card {
+    background: var(--card-bg);
+    border-radius: 30px;
+    box-shadow: 0 4px 12px #e0e0e0;
+    width: 400px;
+    padding: 2em 2.5em;
+    cursor: pointer;
+    transition: box-shadow 0.3s, transform 0.3s;
+  }
+
+  .calc-card:hover {
+    box-shadow: 0 8px 24px #a1c8ff;
+    transform: translateY(-6px);
+  }
+
+  .calc-card h3 {
+    font-size: 1.75em;
+    font-weight: 900;
+    margin-bottom: 1em;
+    text-align: center;
+    color: var(--primary-accent);
+  }
+
+  .calc-card label {
+    font-weight: 700;
+    font-size: 1.1em;
+    color: var(--primary-text);
+  }
+
+  .calc-card input {
+    margin-top: 0.5em;
+    margin-bottom: 1.3em;
+  }
+
+  .calc-card button {
+    width: 100%;
+    padding: 1em 0;
+    background-color: var(--primary-accent);
+    color: var(--canvas-bg);
+    border: none;
+    font-weight: 700;
+    font-size: 1.3em;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+
+  .calc-card button:hover {
+    background-color: #3059c7;
+  }
+
+  .card-output {
+    margin-top: 1em;
+    font-weight: 700;
+    font-size: 1.2em;
+    text-align: center;
+  }
+
+  #links-footer {
+    margin-top: 3em;
+    text-align: center;
+    font-size: 1.2em;
+    font-weight: 600;
+  }
+
+  .social-link {
+    margin: 0 1.2em;
+    color: var(--primary-accent);
+    text-decoration: none;
+    transition: color 0.3s;
+  }
+
+  .social-link:hover {
+    color: #1c68f2;
+  }
+</style>
+</head>
+<body>
+
+<h1>Attendance Tracker</h1>
+<p class="main-desc">Track your attendance easily with real-time calculated stats and class planning.</p>
+
+<button id="trackBtn">Track Attendance</button>
+
+<div id="loginForm">
+  <h2>Login to Fetch Attendance</h2>
+  <form id="form">
+    <label for="roll">Roll Number</label>
+    <input type="text" id="roll" required/>
+    
+    <label for="pass">Password</label>
+    <input type="password" id="pass" required/>
+    
+    <button type="submit">Fetch Attendance</button>
+  </form>
+</div>
+
+<div id="attendanceSection" style="display:none;">
+  <h2>Your Attendance</h2>
+  <table id="attendanceTable" aria-label="Attendance Table">
+    <thead>
+      <tr>
+        <th>Subject</th>
+        <th>Attended</th>
+        <th>Conducted</th>
+        <th>Percentage</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div id="totals"></div>
+</div>
+
+<div id="cards-container">
+  <div class="calc-card" id="addCard" style="display:none;">
+    <h3>How Many to <span style="color:#4CAF50">Add?</span></h3>
+    <form id="calcAddForm">
+      <label for="desiredPercentAdd">Desired Attendance (%)</label>
+      <input type="number" id="desiredPercentAdd" min="0" max="100" step="0.01" required />
+      
+      <label for="totalClassesAdd">Total Classes Conducted</label>
+      <input type="number" id="totalClassesAdd" min="0" required />
+      
+      <label for="attendedClassesAdd">Total Classes Attended</label>
+      <input type="number" id="attendedClassesAdd" min="0" required />
+      
+      <button type="submit">Calculate To Add</button>
+    </form>
+    <div class="card-output" id="addResult"></div>
+  </div>
+  
+  <div class="calc-card" id="bunkCard" style="display:none;">
+    <h3>How Many Can You <span style="color:#F44336">Bunk?</span></h3>
+    <form id="calcBunkForm">
+      <label for="minPercentBunk">Min Attendance Allowed (%)</label>
+      <input type="number" id="minPercentBunk" min="0" max="100" step="0.01" required />
+      
+      <label for="totalClassesBunk">Total Classes Conducted</label>
+      <input type="number" id="totalClassesBunk" min="0" required />
+      
+      <label for="attendedClassesBunk">Total Classes Attended</label>
+      <input type="number" id="attendedClassesBunk" min="0" required />
+      
+      <button type="submit">Calculate to Bunk</button>
+    </form>
+    <div class="card-output" id="bunkResult"></div>
+  </div>
+</div>
+
+<div id="links-footer">
+  <a class="social-link" href="https://www.instagram.com/l.x_003/" target="_blank" rel="noopener">Instagram</a>
+  <a class="social-link" href="https://www.linkedin.com/in/likith-kumar-chippe/" target="_blank" rel="noopener">LinkedIn</a>
+</div>
+
+<script>
+document.getElementById("trackBtn").addEventListener("click", () => {
+  document.getElementById("loginForm").style.display = "block";
+  document.getElementById("trackBtn").style.display = "none";
+});
+
+document.getElementById("form").addEventListener("submit", e => {
+  e.preventDefault();
+  const roll = e.target.roll.value.trim();
+  const pass = e.target.pass.value.trim();
+
+  fetch("http://localhost:3000/api/attendance", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ roll, pass })
+  })
+  .then(res => res.json())
+  .then(resJson => {
+    if(resJson.error) {
+      alert("Error: " + resJson.error);
+      return;
+    }
+    const attendanceData = resJson.data;
+    const tbody = document.querySelector("#attendanceTable tbody");
+    tbody.innerHTML = "";
+    let totalAttended = 0;
+    let totalConducted = 0;
+
+    attendanceData.forEach(row => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${row.subject}</td>
+        <td>${row.attended}</td>
+        <td>${row.conducted}</td>
+        <td>${row.percentage}</td>
+      `;
+      tbody.appendChild(tr);
+      totalAttended += parseInt(row.attended);
+      totalConducted += parseInt(row.conducted);
+    });
+
+    const overallPercent = ((totalAttended / totalConducted) * 100).toFixed(2);
+    document.getElementById("totals").textContent = 
+      `Total Classes Attended: ${totalAttended}, Total Classes Conducted: ${totalConducted}, Overall Attendance: ${overallPercent}%`;
+
+    document.getElementById("attendanceSection").style.display = "block";
+    document.getElementById("loginForm").style.display = "none";
+
+    // Show calculator cards and populate inputs
+    document.getElementById("addCard").style.display = "block";
+    document.getElementById("bunkCard").style.display = "block";
+    document.getElementById("totalClassesAdd").value = totalConducted;
+    document.getElementById("attendedClassesAdd").value = totalAttended;
+    document.getElementById("totalClassesBunk").value = totalConducted;
+    document.getElementById("attendedClassesBunk").value = totalAttended;
+  })
+  .catch(err => alert("Error fetching attendance: " + err.message));
+});
+
+document.getElementById("calcAddForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const desired = parseFloat(document.getElementById("desiredPercentAdd").value);
+  const total = parseInt(document.getElementById("totalClassesAdd").value, 10);
+  let attended = parseInt(document.getElementById("attendedClassesAdd").value, 10);
+
+  if (desired <= 0 || desired > 100) {
+    document.getElementById("addResult").textContent = "Please enter a valid desired percentage (1-100).";
+    return;
+  }
+  if (attended > total) {
+    document.getElementById("addResult").textContent = "Attended classes cannot be more than total classes.";
+    return;
+  }
+  
+  const x = Math.ceil(
+    (desired * total - 100 * attended) / (100 - desired)
+  );
+
+  if (x <= 0) {
+    document.getElementById("addResult").textContent = "You already have the desired attendance!";
+  } else {
+    document.getElementById("addResult").textContent =
+      `You need to attend at least ${x} more classes to reach ${desired}%.`;
+  }
+});
+
+document.getElementById("calcBunkForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const minPercent = parseFloat(document.getElementById("minPercentBunk").value);
+  const total = parseInt(document.getElementById("totalClassesBunk").value, 10);
+  let attended = parseInt(document.getElementById("attendedClassesBunk").value, 10);
+
+  if (minPercent <= 0 || minPercent > 100) {
+    document.getElementById("bunkResult").textContent = "Please enter a valid minimum percentage (1-100).";
+    return;
+  }
+  if (attended > total) {
+    document.getElementById("bunkResult").textContent = "Attended classes cannot be more than total classes.";
+    return;
+  }
+
+  let x = 0, canBunk = true;
+  while (canBunk) {
+    const futureTotal = total + x + 1;
+    const futureAttended = attended;
+    const percent = (futureAttended / futureTotal) * 100;
+    if (percent >= minPercent) x++;
+    else canBunk = false;
+  }
+
+  if (x === 0) {
+    document.getElementById("bunkResult").textContent =
+      "You cannot bunk any more classes without dropping below the desired attendance percentage!";
+  } else {
+    document.getElementById("bunkResult").innerHTML =
+      `You can bunk <strong style="color:#ff7675;">${x - 1}</strong> more classes and still maintain at least ${minPercent}%.`;
+  }
+});
+</script>
+</body>
+</html>
