@@ -83,6 +83,20 @@
     color: var(--primary-text);
     margin-bottom: 1em;
   }
+  .spinner {
+  margin: 0 auto;
+  border: 5px solid #3A7DFF;     /* Outer circle color */
+  border-top: 5px solid white;   /* Highlighted segment */
+  border-radius: 50%;            /* Makes the shape circular */
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;  /* Continuous rotation */
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 
   label {
     display: block;
@@ -265,6 +279,10 @@
     <button type="submit">Fetch Attendance</button>
   </form>
 </div>
+<div id="loading" style="display:none; text-align:center; margin-top: 1em;">
+  <div class="spinner"></div>
+  <div>Loading attendance data...</div>
+</div>
 
 <div id="attendanceSection" style="display:none;">
   <h2>Your Attendance</h2>
@@ -317,7 +335,7 @@
     <div class="card-output" id="bunkResult"></div>
   </div>
 </div>
-
+<p class="main-desc">Connect me with instagram and linkedin.</p>
 <div id="links-footer">
   <a class="social-link" href="https://www.instagram.com/l.x_003/" target="_blank" rel="noopener">Instagram</a>
   <a class="social-link" href="https://www.linkedin.com/in/likith-kumar-chippe/" target="_blank" rel="noopener">LinkedIn</a>
@@ -331,6 +349,10 @@ document.getElementById("trackBtn").addEventListener("click", () => {
 
 document.getElementById("form").addEventListener("submit", e => {
   e.preventDefault();
+
+  // Show loader before fetch
+  document.getElementById("loading").style.display = "block";
+
   const roll = e.target.roll.value.trim();
   const pass = e.target.pass.value.trim();
 
@@ -341,37 +363,45 @@ document.getElementById("form").addEventListener("submit", e => {
   })
   .then(res => res.json())
   .then(resJson => {
+    // Hide loader after data received
+    document.getElementById("loading").style.display = "none";
+
     if(resJson.error) {
       alert("Error: " + resJson.error);
       return;
     }
-    const attendanceData = resJson.data;
+
+    const attendanceData = resJson.data || [];
     const tbody = document.querySelector("#attendanceTable tbody");
     tbody.innerHTML = "";
     let totalAttended = 0;
     let totalConducted = 0;
 
-    attendanceData.forEach(row => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${row.subject}</td>
-        <td>${row.attended}</td>
-        <td>${row.conducted}</td>
-        <td>${row.percentage}</td>
-      `;
-      tbody.appendChild(tr);
-      totalAttended += parseInt(row.attended);
-      totalConducted += parseInt(row.conducted);
-    });
+    if (attendanceData.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="4">No attendance data available.</td></tr>`;
+    } else {
+      attendanceData.forEach(row => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${row.subject || "-"}</td>
+          <td>${row.attended || "0"}</td>
+          <td>${row.conducted || "0"}</td>
+          <td>${row.percentage || "0"}%</td>
+        `;
+        tbody.appendChild(tr);
+        totalAttended += parseInt(row.attended) || 0;
+        totalConducted += parseInt(row.conducted) || 0;
+      });
+    }
 
-    const overallPercent = ((totalAttended / totalConducted) * 100).toFixed(2);
+    let overallPercent = totalConducted ? ((totalAttended / totalConducted) * 100).toFixed(2) : "0.00";
+
     document.getElementById("totals").textContent = 
       `Total Classes Attended: ${totalAttended}, Total Classes Conducted: ${totalConducted}, Overall Attendance: ${overallPercent}%`;
 
+    // Show the attendance and calculators, hide login
     document.getElementById("attendanceSection").style.display = "block";
     document.getElementById("loginForm").style.display = "none";
-
-    // Show calculator cards and populate inputs
     document.getElementById("addCard").style.display = "block";
     document.getElementById("bunkCard").style.display = "block";
     document.getElementById("totalClassesAdd").value = totalConducted;
@@ -379,7 +409,10 @@ document.getElementById("form").addEventListener("submit", e => {
     document.getElementById("totalClassesBunk").value = totalConducted;
     document.getElementById("attendedClassesBunk").value = totalAttended;
   })
-  .catch(err => alert("Error fetching attendance: " + err.message));
+  .catch(err => {
+    document.getElementById("loading").style.display = "none";
+    alert("Error fetching attendance: " + err.message);
+  });
 });
 
 document.getElementById("calcAddForm").addEventListener("submit", e => {
@@ -442,5 +475,6 @@ document.getElementById("calcBunkForm").addEventListener("submit", e => {
   }
 });
 </script>
+
 </body>
 </html>
