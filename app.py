@@ -271,7 +271,7 @@ if "show_overall_calc" not in st.session_state:
 
 # UI
 st.title("📚 Attendance Tracker")
-st.subheader("Get your attendance data from MIT SIMS")
+st.subheader("Get your attendance data from MITS IMS")
 
 # Login form
 with st.form("attendance_form"):
@@ -415,7 +415,7 @@ if st.session_state.attendance_data:
 with st.expander("ℹ️ How to use"):
     st.write("""
     **Steps:**
-    1. Enter your MIT SIMS credentials
+    1. Enter your MITS IMS credentials
     2. Wait 30-60 seconds for scraping
     3. View your attendance details
     4. Use calculator to plan ahead
@@ -436,3 +436,4 @@ st.markdown("""
         <a href='https://instagram.com/ft_._likith' target='_blank'>📸 Instagram</a>
     </div>
 """, unsafe_allow_html=True)
+
