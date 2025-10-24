@@ -226,33 +226,67 @@ def scrape_attendance(roll, password):
 
 
 def calculate_classes_needed(attended, conducted, target_percentage):
+    """
+    Calculate how many classes need to attend to reach target percentage.
+    Formula: (A + x) / (C + x) = T
+    Solving: x = (T*C - A) / (1 - T)
+    """
     if target_percentage <= 0 or target_percentage > 100:
         return "Invalid"
     if conducted <= 0:
         return 0
-    target_decimal = target_percentage / 100.0
+    
+    # Calculate current percentage
     current_percentage = (attended / conducted) * 100.0
+    
+    # If already at or above target, no classes needed
     if current_percentage >= target_percentage:
         return 0
+    
+    # Convert to decimal
+    target_decimal = target_percentage / 100.0
+    
+    # Edge case: impossible to reach 100% if already missed classes
     if target_decimal >= 1.0:
         return float('inf')
+    
+    # Apply formula: x = (T*C - A) / (1 - T)
     x = (target_decimal * conducted - attended) / (1 - target_decimal)
+    
+    # Return ceiling (always round up)
     return max(0, math.ceil(x))
 
 
 def calculate_classes_can_skip(attended, conducted, min_percentage):
+    """
+    Calculate how many classes can skip while maintaining minimum percentage.
+    Formula: A / (C + y) = M
+    Solving: y = (A/M) - C
+    """
     if min_percentage < 0 or min_percentage > 100:
         return "Invalid"
     if conducted <= 0:
         return 0
-    min_decimal = min_percentage / 100.0
+    
+    # Calculate current percentage
     current_percentage = (attended / conducted) * 100.0
+    
+    # If below minimum, cannot skip any
     if current_percentage < min_percentage:
         return 0
+    
+    # Convert to decimal
+    min_decimal = min_percentage / 100.0
+    
+    # Edge case: if minimum is 0%, can skip unlimited (theoretical)
     if min_decimal <= 0:
         return float('inf')
-    x = (attended / min_decimal) - conducted
-    return max(0, math.floor(x))
+    
+    # Apply formula: y = (A/M) - C
+    y = (attended / min_decimal) - conducted
+    
+    # Return floor (always round down for safety)
+    return max(0, math.floor(y))
 
 
 # Session state
@@ -347,36 +381,103 @@ if st.session_state.attendance_data:
     if st.session_state.show_overall_calc:
         st.markdown("---")
         calc_type = st.radio("Calculate:", ("📈 Classes to Attend", "📉 Classes to Skip"), horizontal=True)
-        desired_percentage = st.number_input("Desired %", 0, 100, 75, 1, key="desired_pct")
+        desired_percentage = st.number_input("Desired Attendance Percentage (%)", 0, 100, 75, 1, key="desired_pct")
         
         if st.button("Calculate", use_container_width=True, key="calc"):
+            # Get overall totals
+            total_attended = df["Attended"].sum()
+            total_conducted = df["Conducted"].sum()
+            current_overall = (total_attended / total_conducted) * 100 if total_conducted > 0 else 0
+            
             if calc_type == "📈 Classes to Attend":
-                total = 0
-                for _, row in df.iterrows():
-                    need = calculate_classes_needed(row["Attended"], row["Conducted"], desired_percentage)
-                    if isinstance(need, (int, float)) and need != float('inf'):
-                        total += need
-                if total > 0:
-                    st.success(f"🎯 **Attend {int(total)} more classes to reach {desired_percentage}%**")
+                # Check if already at target
+                if current_overall >= desired_percentage:
+                    st.success(f"🎉 **You already have {current_overall:.1f}% attendance!**")
+                    st.info(f"Your target is {desired_percentage}%. No need to attend extra classes! ✅")
                 else:
-                    st.success(f"✅ Already at {desired_percentage}%!")
-            else:
-                total = 0
-                for _, row in df.iterrows():
-                    if row["Percentage_Float"] >= desired_percentage:
-                        skip = calculate_classes_can_skip(row["Attended"], row["Conducted"], desired_percentage)
-                        if isinstance(skip, (int, float)) and skip != float('inf'):
-                            total += skip
-                if total > 0:
-                    st.success(f"😎 **Can skip {int(total)} classes and maintain {desired_percentage}%**")
+                    # Calculate total classes needed across all subjects
+                    total_classes_needed = 0
+                    impossible_subjects = []
+                    
+                    for _, row in df.iterrows():
+                        need = calculate_classes_needed(row["Attended"], row["Conducted"], desired_percentage)
+                        if need == float('inf'):
+                            impossible_subjects.append(row["Subject"])
+                        elif isinstance(need, (int, float)) and not math.isnan(need):
+                            total_classes_needed += need
+                    
+                    if impossible_subjects:
+                        st.warning(f"⚠️ Cannot reach {desired_percentage}% in: {', '.join(impossible_subjects)}")
+                    
+                    if total_classes_needed > 0:
+                        # Calculate future overall percentage
+                        future_attended = total_attended + total_classes_needed
+                        future_conducted = total_conducted + total_classes_needed
+                        future_overall = (future_attended / future_conducted) * 100
+                        
+                        st.success(f"🎯 **You need to attend {int(total_classes_needed)} more classes**")
+                        st.info(f"📊 **Current:** {current_overall:.1f}% → **After:** {future_overall:.1f}%")
+                        st.caption(f"Formula: ({total_attended} + {int(total_classes_needed)}) / ({total_conducted} + {int(total_classes_needed)}) = {future_overall:.1f}%")
+                    else:
+                        st.success(f"✅ You're already at {current_overall:.1f}%!")
+                        
+            else:  # Classes to Skip
+                # Check if below minimum
+                if current_overall < desired_percentage:
+                    st.error(f"⚠️ **Your current attendance is {current_overall:.1f}%**")
+                    st.warning(f"You're below {desired_percentage}%. Cannot skip any classes!")
                 else:
-                    st.warning(f"⚠️ Cannot skip any classes")
+                    # Calculate total classes can skip across all subjects
+                    total_classes_can_skip = 0
+                    below_subjects = []
+                    unlimited = False
+                    
+                    for _, row in df.iterrows():
+                        if row["Percentage_Float"] < desired_percentage:
+                            below_subjects.append(f"{row['Subject']} ({row['Percentage_Float']:.1f}%)")
+                        else:
+                            skip = calculate_classes_can_skip(row["Attended"], row["Conducted"], desired_percentage)
+                            if skip == float('inf'):
+                                unlimited = True
+                                break
+                            elif isinstance(skip, (int, float)) and not math.isnan(skip):
+                                total_classes_can_skip += skip
+                    
+                    if below_subjects:
+                        st.error(f"⚠️ These subjects are below {desired_percentage}%:")
+                        for subj in below_subjects:
+                            st.write(f"   • {subj}")
+                    
+                    if unlimited:
+                        st.success(f"🎉 **You can skip unlimited classes!** (theoretical)")
+                        st.info(f"Current attendance: {current_overall:.1f}%")
+                    elif total_classes_can_skip > 0:
+                        # Calculate future overall percentage after skipping
+                        future_conducted = total_conducted + total_classes_can_skip
+                        future_overall = (total_attended / future_conducted) * 100
+                        
+                        st.success(f"😎 **You can skip {int(total_classes_can_skip)} classes**")
+                        st.info(f"📊 **Current:** {current_overall:.1f}% → **After:** {future_overall:.1f}%")
+                        st.caption(f"Formula: {total_attended} / ({total_conducted} + {int(total_classes_can_skip)}) = {future_overall:.1f}%")
+                    else:
+                        st.warning(f"⚠️ Cannot skip any classes while maintaining {desired_percentage}%")
     
     csv = display_df.to_csv(index=False)
     st.download_button("📥 Download CSV", csv, f"attendance_{st.session_state.last_roll}.csv", "text/csv", use_container_width=True)
 
 with st.expander("ℹ️ How to use"):
-    st.write("1. Enter credentials\n2. Wait 30-60s\n3. View results\n4. Use calculator\n5. Download CSV")
+    st.write("""
+    **Steps:**
+    1. Enter your MIT SIMS credentials
+    2. Wait 30-60 seconds for scraping
+    3. View your attendance details
+    4. Use calculator to plan ahead
+    5. Download data as CSV
+    
+    **Calculator:**
+    - **Classes to Attend:** How many classes to reach target %
+    - **Classes to Skip:** How many classes you can safely skip
+    """)
 
 st.markdown("---")
 st.markdown("""
