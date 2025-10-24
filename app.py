@@ -7,29 +7,30 @@ import os
 import tempfile
 import json
 
-
 # Install Playwright browsers on first run (for Streamlit Cloud)
 @st.cache_resource
 def install_playwright_browsers():
     try:
-        subprocess.run(
-            [sys.executable, "-m", "playwright", "install", "chromium"],
+        # Install chromium with dependencies
+        result = subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium", "--with-deps"],
             check=True,
             capture_output=True,
-            timeout=300
+            timeout=300,
+            text=True
         )
-        return True
-    except:
-        return False
+        return True, "Playwright installed successfully"
+    except Exception as e:
+        return False, str(e)
 
 # Call once at startup
-install_playwright_browsers()
+playwright_status, playwright_msg = install_playwright_browsers()
 
 st.set_page_config(page_title="Attendance Tracker", page_icon="📚", layout="wide")
 
 
 def create_scraper_script():
-    # This replicates your EXACT original scraper.js logic
+    # Enhanced scraper with better error handling and debugging
     return r'''
 import asyncio
 import sys
@@ -39,34 +40,52 @@ from playwright.async_api import async_playwright
 
 async def scrape_attendance_async(roll, password):
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
-
-
         try:
-            # EXACT steps from your original scraper.js
-            await page.goto("http://mitsims.in/", wait_until="load")
+            # Launch browser with specific args for cloud environments
+            browser = await p.chromium.launch(
+                headless=True,
+                args=[
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu'
+                ]
+            )
+            page = await browser.new_page()
+
+            # Navigate to MIT SIMS
+            await page.goto("http://mitsims.in/", wait_until="load", timeout=30000)
+            await page.wait_for_timeout(2000)
             
-            # Click student link - EXACTLY as your original code
+            # Click student link
             await page.click("a#studentLink")
+            await page.wait_for_timeout(3000)
             
-            # Wait for login form - EXACTLY as original
+            # Wait for login form
             await page.wait_for_selector("#stuLogin input.login_box", timeout=15000)
             
-            # Fill roll number - first input box
+            # Fill credentials
             await page.fill("#stuLogin input.login_box:nth-of-type(1)", roll)
-            
-            # Fill password - second input box
+            await page.wait_for_timeout(500)
             await page.fill("#stuLogin input.login_box:nth-of-type(2)", password)
+            await page.wait_for_timeout(500)
             
-            # Click submit button
+            # Submit login
             await page.click("#stuLogin button[type='submit']")
             
-            # Wait for page to load - EXACTLY as original
-            await page.wait_for_load_state("networkidle")
-            await page.wait_for_timeout(5000)
+            # Wait for page load after login - increased timeout
+            await page.wait_for_load_state("networkidle", timeout=30000)
+            await page.wait_for_timeout(8000)
             
-            # Extract attendance data - EXACTLY as original JavaScript code
+            # Get page content for debugging
+            page_text = await page.inner_text("body")
+            
+            # Check if login failed
+            if "invalid" in page_text.lower() or "incorrect" in page_text.lower():
+                await browser.close()
+                return {"error": "Invalid credentials", "success": False, "debug": "Login failed"}
+            
+            # Extract attendance data
             attendance_data = await page.evaluate("""
                 () => {
                     const text = document.body.innerText;
@@ -83,7 +102,11 @@ async def scrape_attendance_async(roll, password):
                             break;
                         }
                     }
-                    if (startIndex === -1) return [];
+                    
+                    if (startIndex === -1) {
+                        // Return debug info if pattern not found
+                        return [];
+                    }
                     
                     const data = [];
                     for (let i = startIndex; i < lines.length; i += 5) {
@@ -127,6 +150,10 @@ async def scrape_attendance_async(roll, password):
             """)
             
             await browser.close()
+            
+            if not attendance_data or len(attendance_data) == 0:
+                return {"error": "No attendance data found on page", "success": False, "debug": "Empty data"}
+            
             return {"data": attendance_data, "success": True}
             
         except Exception as error:
@@ -134,7 +161,7 @@ async def scrape_attendance_async(roll, password):
                 await browser.close()
             except:
                 pass
-            return {"error": str(error), "success": False}
+            return {"error": str(error), "success": False, "debug": str(error)}
 
 
 if __name__ == "__main__":
@@ -153,38 +180,36 @@ def scrape_attendance(roll, password):
             f.write(create_scraper_script())
             script_path = f.name
 
-
         # Run the scraper
         proc = subprocess.run(
             [sys.executable, script_path, roll, password],
             capture_output=True,
             text=True,
-            timeout=90
+            timeout=120  # Increased timeout
         )
-
 
         # Clean up
         os.unlink(script_path)
 
-
         if proc.returncode != 0:
-            raise Exception(f"Process failed: {proc.stderr}")
-
+            error_msg = proc.stderr.strip() if proc.stderr else "Unknown error"
+            raise Exception(f"Process failed: {error_msg}")
 
         # Parse result
-        result = json.loads(proc.stdout.strip())
+        try:
+            result = json.loads(proc.stdout.strip())
+        except json.JSONDecodeError:
+            raise Exception(f"Could not parse response. Output: {proc.stdout[:200]}")
         
         if not result.get("success", False):
             error = result.get("error", "Unknown error")
-            raise Exception(f"Scraping failed: {error}")
-
+            debug = result.get("debug", "")
+            raise Exception(f"{error} (Debug: {debug})")
 
         return result.get("data", [])
         
     except subprocess.TimeoutExpired:
-        raise Exception("Timeout - scraping took too long")
-    except json.JSONDecodeError as e:
-        raise Exception(f"Could not parse response: {e}")
+        raise Exception("Timeout - scraping took too long (120s)")
     except Exception as e:
         raise e
 
@@ -242,6 +267,9 @@ if "show_overall_calc" not in st.session_state:
 st.title("📚 Attendance Tracker")
 st.subheader("Get your attendance data from MIT SIMS")
 
+# Show Playwright status (for debugging)
+if not playwright_status:
+    st.warning(f"⚠️ Playwright setup issue: {playwright_msg}")
 
 # Login form
 with st.form("attendance_form"):
@@ -268,13 +296,13 @@ if submit_button:
         
         try:
             status_text.text("🔍 Connecting to server...")
-            progress_bar.progress(25)
+            progress_bar.progress(20)
             
             status_text.text("🔐 Logging in...")
-            progress_bar.progress(50)
+            progress_bar.progress(40)
             
-            status_text.text("📊 Scraping attendance data...")
-            progress_bar.progress(75)
+            status_text.text("📊 Scraping attendance data (this may take 30-60 seconds)...")
+            progress_bar.progress(70)
             
             # Call scraper
             attendance_data = scrape_attendance(roll, password)
@@ -286,16 +314,30 @@ if submit_button:
             progress_bar.empty()
             status_text.empty()
             
-            if attendance_data:
+            if attendance_data and len(attendance_data) > 0:
                 st.session_state.attendance_data = attendance_data
                 st.success(f"✅ Attendance data retrieved successfully! Found {len(attendance_data)} subjects")
             else:
-                st.warning("No attendance data found. Please check your credentials.")
+                st.warning("⚠️ No attendance data found. This could mean:\n- The portal might be under maintenance\n- Your session might have timed out\n- The page structure has changed")
         
         except Exception as e:
             progress_bar.empty()
             status_text.empty()
-            st.error(f"An error occurred: {str(e)}")
+            st.error(f"❌ An error occurred: {str(e)}")
+            
+            with st.expander("🔧 Troubleshooting"):
+                st.write("""
+                **If you're seeing this error:**
+                1. Verify your credentials work on http://mitsims.in manually
+                2. Check if the portal is accessible
+                3. The portal might be under maintenance
+                4. Try again in a few minutes
+                
+                **Common issues:**
+                - Wrong roll number or password format
+                - Portal is down or slow
+                - Session timeout
+                """)
 
 
 # Display attendance if available
@@ -460,10 +502,12 @@ if st.session_state.attendance_data:
 with st.expander("ℹ️ How to use"):
     st.write("""
     1. Enter your MIT SIMS roll number and password
-    2. Click 'Get Attendance' to scrape your data
+    2. Click 'Get Attendance' to scrape your data (may take 30-60 seconds)
     3. View your attendance statistics and breakdown
     4. Click **Open Attendance Calculator** to calculate total classes across all subjects
     5. Download data as CSV if needed
+    
+    **Note:** First load may take longer as browser installs.
     """)
 
 
@@ -483,5 +527,3 @@ st.markdown("""
         </p>
     </div>
 """, unsafe_allow_html=True)
-
-
