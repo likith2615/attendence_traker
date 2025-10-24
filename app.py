@@ -10,17 +10,20 @@ import json
 
 # Install Playwright browsers on first run (for Streamlit Cloud)
 @st.cache_resource
-def install_playwright():
+def install_playwright_browsers():
     try:
-        subprocess.run([sys.executable, "-m", "playwright", "install", "chromium", "--with-deps"], 
-                       check=True, capture_output=True)
+        subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            check=True,
+            capture_output=True,
+            timeout=300
+        )
         return True
-    except Exception as e:
+    except:
         return False
 
-# Call this once
-install_playwright()
-
+# Call once at startup
+install_playwright_browsers()
 
 st.set_page_config(page_title="Attendance Tracker", page_icon="📚", layout="wide")
 
@@ -480,4 +483,5 @@ st.markdown("""
         </p>
     </div>
 """, unsafe_allow_html=True)
+
 
