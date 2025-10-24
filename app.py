@@ -271,7 +271,7 @@ if "show_overall_calc" not in st.session_state:
 
 # UI
 st.title("📚 Attendance Tracker")
-st.subheader("Get your attendance data from MITS IMS")
+st.subheader("Get your attendance data from MITS IMS by Likith")
 
 # Login form
 with st.form("attendance_form"):
@@ -436,4 +436,5 @@ st.markdown("""
         <a href='https://instagram.com/ft_._likith' target='_blank'>📸 Instagram</a>
     </div>
 """, unsafe_allow_html=True)
+
 
