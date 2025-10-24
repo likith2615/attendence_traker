@@ -1,2 +1,2 @@
-chromium-browser
-chromium-codecs-ffmpeg
+chromium
+chromium-driver
