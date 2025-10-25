@@ -74,7 +74,7 @@ text
 ### Installation
 
 1. **Clone the repository**
-git clone https://github.com/yourusername/attendance_tracker.git
+git clone [https://github.com/yourusername/attendance_tracker.git](https://github.com/likith2615/attendence_traker/)
 cd attendance_tracker
 
 text
