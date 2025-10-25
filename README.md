@@ -1,6 +1,6 @@
 # 📚 Attendance Tracker
 
-**Attendance Tracker** is a powerful Streamlit web application that automatically scrapes your attendance data from the [MIT SIMS Portal](http://mitsims.in) and provides intelligent calculators to help you strategically plan your classes!
+**Attendance Tracker** is a powerful Streamlit web application that automatically scrapes your attendance data from the [MITS IMS Portal](http://mitsims.in) and provides intelligent calculators to help you strategically plan your classes!
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://ims-tracker.streamlit.app/)
 
