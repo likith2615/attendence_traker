@@ -109,7 +109,7 @@ The app will open in your browser at `http://localhost:8501`
 ---
 
 ## 📁 Project Structure
-
+'''
 attendance_tracker/
 │
 ├── app.py # Main Streamlit application
@@ -118,7 +118,7 @@ attendance_tracker/
 ├── README.md # This file
 └── .streamlit/
 └── config.toml # Streamlit configuration
-
+'''
 text
 
 ---
@@ -135,12 +135,9 @@ text
 ## 📸 Screenshots
 
 ### Main Dashboard
-![Dashboard](https://via.placeholder.com/800x400?text=Attendance+Dashboard)
+![Dashboard](https://i.postimg.cc/G3ftpzYL/Screenshot-2025-10-25-130955.png)
 
-### Calculator in Action
-![Calculator](https://via.placeholder.com/800x400?text=Smart+Calculator)
 
----
 
 ## 🔒 Security & Privacy
 
