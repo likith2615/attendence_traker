@@ -323,14 +323,33 @@ if st.session_state.attendance_data:
     df["Attended"] = df["Attended"].astype(int)
     df["Conducted"] = df["Conducted"].astype(int)
     df["Percentage_Float"] = df["Percentage"].str.rstrip('%').astype(float)
-    
+    df["Calculated_Percentage"] = (df["Attended"] / df["Conducted"].replace(0, pd.NA) * 100).fillna(0)
+
+    total_attended = int(df["Attended"].sum())
+    total_conducted = int(df["Conducted"].sum())
+    overall_attendance = (total_attended / total_conducted) * 100 if total_conducted > 0 else 0
+
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Average Attendance", f"{df['Percentage_Float'].mean():.1f}%")
+        st.metric("Overall Attendance", f"{overall_attendance:.1f}%")
     with col2:
-        st.metric("Total Attended", int(df["Attended"].sum()))
+        st.metric("Total Attended", total_attended)
     with col3:
-        st.metric("Total Conducted", int(df["Conducted"].sum()))
+        st.metric("Total Conducted", total_conducted)
+
+    with st.expander("📌 Percentage calculation details"):
+        st.write(
+            "Overall attendance should be weighted by total classes, not the plain mean of subject percentages."
+        )
+        st.caption(
+            f"Weighted overall = ({total_attended}/{total_conducted}) × 100 = {overall_attendance:.2f}%"
+        )
+        st.caption(
+            f"Unweighted mean of subject percentages = {df['Percentage_Float'].mean():.2f}%"
+        )
+        mismatch_count = (df["Percentage_Float"].round(2) != df["Calculated_Percentage"].round(2)).sum()
+        if mismatch_count:
+            st.warning(f"Detected {mismatch_count} subject(s) where portal percentage differs from calculated percentage.")
     
     st.subheader("📊 Attendance Details")
     
@@ -342,8 +361,34 @@ if st.session_state.attendance_data:
             return 'background-color: #f8d7da; color: #721c24'
         return ''
     
-    display_df = df[["S.No", "Subject", "Attended", "Conducted", "Percentage"]].copy()
+    st.subheader("🎛️ Interactive Filters")
+    fc1, fc2, fc3 = st.columns([1, 2, 1])
+    with fc1:
+        threshold = st.slider("Highlight below (%)", 0, 100, 75)
+    with fc2:
+        selected_subjects = st.multiselect("Subjects", options=df["Subject"].tolist(), default=df["Subject"].tolist())
+    with fc3:
+        sort_by = st.selectbox("Sort by", ["Subject", "Percentage", "Attended", "Conducted"])
+
+    filtered_df = df[df["Subject"].isin(selected_subjects)].copy()
+    sort_col = "Calculated_Percentage" if sort_by == "Percentage" else sort_by
+    filtered_df = filtered_df.sort_values(by=sort_col, ascending=(sort_by == "Subject"))
+
+    display_df = filtered_df[["S.No", "Subject", "Attended", "Conducted", "Percentage"]].copy()
     st.dataframe(display_df.style.applymap(color_percentage, subset=['Percentage']), use_container_width=True)
+
+    st.write("#### Subject-wise attendance")
+    progress_cols = st.columns(2)
+    for idx, row in filtered_df.reset_index(drop=True).iterrows():
+        with progress_cols[idx % 2]:
+            pct = float(row["Calculated_Percentage"])
+            status = "✅" if pct >= threshold else "⚠️"
+            st.write(f"{status} **{row['Subject']}** — {pct:.1f}%")
+            st.progress(min(max(pct / 100, 0), 1.0))
+
+    st.write("#### Attendance comparison chart")
+    chart_df = filtered_df[["Subject", "Calculated_Percentage"]].set_index("Subject")
+    st.bar_chart(chart_df)
     
     st.subheader("🎯 Attendance Calculator")
     
@@ -357,8 +402,6 @@ if st.session_state.attendance_data:
         
         if st.button("Calculate", use_container_width=True, key="calc"):
             # Get OVERALL totals (not per subject)
-            total_attended = df["Attended"].sum()
-            total_conducted = df["Conducted"].sum()
             current_overall = (total_attended / total_conducted) * 100 if total_conducted > 0 else 0
             
             if calc_type == "📈 Classes to Attend":
