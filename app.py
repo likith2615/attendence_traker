@@ -261,6 +261,12 @@ def calculate_classes_can_skip(attended, conducted, min_percentage):
     return max(0, math.floor(x))
 
 
+def calculate_percentage(attended, conducted):
+    if conducted <= 0:
+        return 0.0
+    return (attended / conducted) * 100.0
+
+
 # Session state
 if "attendance_data" not in st.session_state:
     st.session_state.attendance_data = None
@@ -322,15 +328,33 @@ if st.session_state.attendance_data:
     df.columns = ["S.No", "Subject", "Attended", "Conducted", "Percentage"]
     df["Attended"] = df["Attended"].astype(int)
     df["Conducted"] = df["Conducted"].astype(int)
-    df["Percentage_Float"] = df["Percentage"].str.rstrip('%').astype(float)
+    df["Scraped_Percentage"] = df["Percentage"].str.rstrip('%').astype(float)
+    df["Computed_Percentage"] = df.apply(
+        lambda row: calculate_percentage(row["Attended"], row["Conducted"]), axis=1
+    )
+    total_attended = int(df["Attended"].sum())
+    total_conducted = int(df["Conducted"].sum())
+    overall_percentage = calculate_percentage(total_attended, total_conducted)
+
+    # Prefer mathematically-correct weighted overall instead of simple mean of percentages.
+    mean_percentage = float(df["Computed_Percentage"].mean())
+    mismatch_subjects = df[(df["Scraped_Percentage"] - df["Computed_Percentage"]).abs() > 0.1]
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Average Attendance", f"{df['Percentage_Float'].mean():.1f}%")
+        st.metric("Overall Attendance", f"{overall_percentage:.1f}%", help="Weighted overall percentage based on total attended/total conducted classes")
     with col2:
-        st.metric("Total Attended", int(df["Attended"].sum()))
+        st.metric("Total Attended", total_attended)
     with col3:
-        st.metric("Total Conducted", int(df["Conducted"].sum()))
+        st.metric("Total Conducted", total_conducted)
+
+    st.caption(f"Simple average across subjects: {mean_percentage:.1f}% (shown only for comparison)")
+
+    if not mismatch_subjects.empty:
+        st.warning(
+            f"{len(mismatch_subjects)} subject(s) had scraped percentages that did not match attended/conducted values. "
+            "Showing computed percentages for accuracy."
+        )
     
     st.subheader("📊 Attendance Details")
     
@@ -342,8 +366,48 @@ if st.session_state.attendance_data:
             return 'background-color: #f8d7da; color: #721c24'
         return ''
     
-    display_df = df[["S.No", "Subject", "Attended", "Conducted", "Percentage"]].copy()
+    display_df = df[["S.No", "Subject", "Attended", "Conducted", "Computed_Percentage"]].copy()
+    display_df["Computed_Percentage"] = display_df["Computed_Percentage"].map(lambda value: f"{value:.2f}%")
+    display_df = display_df.rename(columns={"Computed_Percentage": "Percentage"})
     st.dataframe(display_df.style.applymap(color_percentage, subset=['Percentage']), use_container_width=True)
+
+    st.subheader("⚡ Interactive Insights")
+    target_threshold = st.slider("Set your target attendance", min_value=50, max_value=95, value=75, step=1)
+
+    df["Status"] = df["Computed_Percentage"].apply(lambda x: "On Track" if x >= target_threshold else "Needs Attention")
+    st.progress(min(overall_percentage, 100.0) / 100.0, text=f"Overall progress toward classes: {overall_percentage:.2f}%")
+
+    insight_cols = st.columns(2)
+    with insight_cols[0]:
+        at_risk_count = int((df["Computed_Percentage"] < target_threshold).sum())
+        st.metric("Subjects below target", at_risk_count)
+    with insight_cols[1]:
+        best_subject = df.sort_values("Computed_Percentage", ascending=False).iloc[0]
+        st.metric("Best subject", f"{best_subject['Subject']} ({best_subject['Computed_Percentage']:.1f}%)")
+
+    st.bar_chart(df.set_index("Subject")["Computed_Percentage"])
+
+    with st.expander("Subject-wise action plan"):
+        selected_subject = st.selectbox("Choose subject", options=df["Subject"].tolist())
+        selected_row = df[df["Subject"] == selected_subject].iloc[0]
+        subject_attended = int(selected_row["Attended"])
+        subject_conducted = int(selected_row["Conducted"])
+        subject_current = float(selected_row["Computed_Percentage"])
+
+        st.write(f"Current attendance in **{selected_subject}**: **{subject_current:.2f}%**")
+
+        subject_needed = calculate_classes_needed(subject_attended, subject_conducted, target_threshold)
+        subject_skip = calculate_classes_can_skip(subject_attended, subject_conducted, target_threshold)
+
+        if subject_current >= target_threshold:
+            st.success(f"You are already above {target_threshold}% in this subject.")
+        else:
+            st.info(f"Attend **{int(subject_needed)}** more consecutive classes in this subject to reach {target_threshold}%.")
+
+        if subject_skip == float('inf'):
+            st.warning(f"You can skip unlimited classes in this subject for a {target_threshold}% target.")
+        else:
+            st.warning(f"You can skip **{int(subject_skip)}** class(es) in this subject while staying at {target_threshold}%.")
     
     st.subheader("🎯 Attendance Calculator")
     
@@ -357,9 +421,7 @@ if st.session_state.attendance_data:
         
         if st.button("Calculate", use_container_width=True, key="calc"):
             # Get OVERALL totals (not per subject)
-            total_attended = df["Attended"].sum()
-            total_conducted = df["Conducted"].sum()
-            current_overall = (total_attended / total_conducted) * 100 if total_conducted > 0 else 0
+            current_overall = calculate_percentage(total_attended, total_conducted)
             
             if calc_type == "📈 Classes to Attend":
                 # Check if already at target
